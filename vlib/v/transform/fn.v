@@ -6638,7 +6638,11 @@ fn (mut t Transformer) wrap_string_conversion(expr flat.NodeId, typ_id u32) flat
 			return t.make_call_typed('f64.str', [expr], flat.source_type_string)
 		}
 		else {
-			if flat.source_type_name(clean_typ) in t.enum_types {
+			// An imported enum is indexed under its bare short name too. That alias must
+			// not win over a struct the current module declares: `[]Flag` in module
+			// `foo` names `foo.Flag` even when another module's enum `Flag` is indexed.
+			local_struct_shadows_enum := t.bare_struct_name_is_local_to_current_module(clean_type_id)
+			if !local_struct_shadows_enum && flat.source_type_name(clean_typ) in t.enum_types {
 				if method := t.enum_str_method_name(clean_type_id) {
 					return t.make_call_typed(method, [expr], flat.source_type_string)
 				}
@@ -6649,7 +6653,7 @@ fn (mut t Transformer) wrap_string_conversion(expr flat.NodeId, typ_id u32) flat
 				&& t.cur_module != 'builtin' {
 				qenum = '${t.cur_module}.${flat.source_type_name(clean_typ)}'
 			}
-			if qenum in t.enum_types {
+			if !local_struct_shadows_enum && qenum in t.enum_types {
 				if method := t.enum_str_method_name(flat.source_type_id(qenum)) {
 					return t.make_call_typed(method, [expr], flat.source_type_string)
 				}
